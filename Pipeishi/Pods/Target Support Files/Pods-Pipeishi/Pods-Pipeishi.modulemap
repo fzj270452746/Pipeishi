@@ -1,0 +1,6 @@
+framework module Pods_Pipeishi {
+  umbrella header "Pods-Pipeishi-umbrella.h"
+
+  export *
+  module * { export * }
+}
