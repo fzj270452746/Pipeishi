@@ -1,44 +1,44 @@
 
 import UIKit
-import CleoaQing
 import Alamofire
+import CleoaQing
 
-final class MainMenuViewController: UIViewController {
+final class HomeViewController: UIViewController {
 
-    private let backgroundView = AnimatedGradientView()
-    private let scrollView = ControlSensitiveScrollView()
-    private let contentStack = UIStackView()
-    private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
-    private let buttonStack = UIStackView()
-    private let relaxedButton = DifficultyButton(difficulty: .relaxed)
-    private let relentlessButton = DifficultyButton(difficulty: .relentless)
-    private let leaderboardContainer = UIView()
-    private let leaderboardHeader = UILabel()
-    private let difficultyControl = UISegmentedControl(items: GameDifficulty.allCases.map { $0.title })
-    private let leaderboardTable = UITableView(frame: .zero, style: .plain)
-    private let settingsButton = SettingsLinkView()
+    private lazy var animatedBackground = DynamicGradientBackground()
+    private lazy var mainScrollView = TouchOptimizedScrollView()
+    private lazy var verticalContentStack = UIStackView()
+    private lazy var gameTitleText = UILabel()
+    private lazy var gameDescriptionText = UILabel()
+    private lazy var challengeButtonsContainer = UIStackView()
+    private lazy var easyModeButton = ChallengeLevelButton(challengeType: .relaxed)
+    private lazy var hardModeButton = ChallengeLevelButton(challengeType: .relentless)
+    private lazy var scoreBoardWrapper = UIView()
+    private lazy var scoreBoardTitle = UILabel()
+    private lazy var levelSelector = UISegmentedControl(items: ChallengeLevel.allCases.map { $0.displayName })
+    private lazy var scoreListTableView = UITableView(frame: .zero, style: .plain)
+    private lazy var settingsNavigationButton = SettingsNavigationControl()
 
-    private var selectedDifficulty: GameDifficulty = .relaxed {
+    private var currentSelectedLevel: ChallengeLevel = .relaxed {
         didSet {
-            difficultyControl.selectedSegmentIndex = GameDifficulty.allCases.firstIndex(of: selectedDifficulty) ?? 0
-            reloadScores()
+            levelSelector.selectedSegmentIndex = ChallengeLevel.allCases.firstIndex(of: currentSelectedLevel) ?? 0
+            refreshScoreBoard()
         }
     }
 
-    private var scores: [Int] = []
+    private var displayedScores: [Int] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        configure()
-        configureLayout()
-        reloadScores()
+        setupViewControllerConfiguration()
+        buildLayoutHierarchy()
+        refreshScoreBoard()
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
-        reloadScores()
+        refreshScoreBoard()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -48,136 +48,136 @@ final class MainMenuViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        backgroundView.beginAnimationIfNeeded()
+        animatedBackground.activateAnimationIfNeeded()
     }
 
-    private func configure() {
+    private func setupViewControllerConfiguration() {
         title = "Mahjong Match Ten"
         view.backgroundColor = UIColor(red: 0.06, green: 0.09, blue: 0.12, alpha: 1.0)
         navigationItem.backButtonDisplayMode = .minimal
 
-        difficultyControl.selectedSegmentIndex = 0
-        difficultyControl.addTarget(self, action: #selector(onDifficultySegmentChanged), for: .valueChanged)
-        difficultyControl.selectedSegmentTintColor = UIColor(red: 0.74, green: 0.34, blue: 0.36, alpha: 1.0)
-        difficultyControl.setTitleTextAttributes([
+        levelSelector.selectedSegmentIndex = 0
+        levelSelector.addTarget(self, action: #selector(handleLevelSelectorChange), for: .valueChanged)
+        levelSelector.selectedSegmentTintColor = UIColor(red: 0.74, green: 0.34, blue: 0.36, alpha: 1.0)
+        levelSelector.setTitleTextAttributes([
             .foregroundColor: UIColor.white,
             .font: UIFont.systemFont(ofSize: 14, weight: .semibold)
         ], for: .selected)
-        difficultyControl.setTitleTextAttributes([
+        levelSelector.setTitleTextAttributes([
             .foregroundColor: UIColor(red: 0.72, green: 0.78, blue: 0.82, alpha: 1.0),
             .font: UIFont.systemFont(ofSize: 14, weight: .medium)
         ], for: .normal)
-        difficultyControl.backgroundColor = UIColor(red: 0.14, green: 0.19, blue: 0.22, alpha: 1.0)
+        levelSelector.backgroundColor = UIColor(red: 0.14, green: 0.19, blue: 0.22, alpha: 1.0)
 
-        leaderboardTable.register(LeaderboardCell.self, forCellReuseIdentifier: LeaderboardCell.reuseIdentifier)
-        leaderboardTable.delegate = self
-        leaderboardTable.dataSource = self
-        leaderboardTable.separatorStyle = .none
-        leaderboardTable.backgroundColor = .clear
-        leaderboardTable.showsVerticalScrollIndicator = false
-        leaderboardTable.isScrollEnabled = false
+        scoreListTableView.register(ScoreBoardTableCell.self, forCellReuseIdentifier: ScoreBoardTableCell.cellIdentifier)
+        scoreListTableView.delegate = self
+        scoreListTableView.dataSource = self
+        scoreListTableView.separatorStyle = .none
+        scoreListTableView.backgroundColor = .clear
+        scoreListTableView.showsVerticalScrollIndicator = false
+        scoreListTableView.isScrollEnabled = false
 
-        settingsButton.addTarget(self, action: #selector(onSettingsTapped), for: .touchUpInside)
-        relaxedButton.addTarget(self, action: #selector(startRelaxedGame), for: .touchUpInside)
-        relentlessButton.addTarget(self, action: #selector(startRelentlessGame), for: .touchUpInside)
+        settingsNavigationButton.addTarget(self, action: #selector(handleSettingsButtonPress), for: .touchUpInside)
+        easyModeButton.addTarget(self, action: #selector(launchEasyChallenge), for: .touchUpInside)
+        hardModeButton.addTarget(self, action: #selector(launchHardChallenge), for: .touchUpInside)
     }
 
-    private func configureLayout() {
-        view.addSubview(backgroundView)
-        backgroundView.translatesAutoresizingMaskIntoConstraints = false
+    private func buildLayoutHierarchy() {
+        view.addSubview(animatedBackground)
+        animatedBackground.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            backgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            backgroundView.topAnchor.constraint(equalTo: view.topAnchor),
-            backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            animatedBackground.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            animatedBackground.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            animatedBackground.topAnchor.constraint(equalTo: view.topAnchor),
+            animatedBackground.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
 
-        view.addSubview(scrollView)
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(mainScrollView)
+        mainScrollView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            mainScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            mainScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            mainScrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            mainScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
 
-        contentStack.axis = .vertical
-        contentStack.spacing = 24
-        contentStack.translatesAutoresizingMaskIntoConstraints = false
-        contentStack.layoutMargins = UIEdgeInsets(top: 24, left: 24, bottom: 48, right: 24)
-        contentStack.isLayoutMarginsRelativeArrangement = true
-        scrollView.addSubview(contentStack)
+        verticalContentStack.axis = .vertical
+        verticalContentStack.spacing = 24
+        verticalContentStack.translatesAutoresizingMaskIntoConstraints = false
+        verticalContentStack.layoutMargins = UIEdgeInsets(top: 24, left: 24, bottom: 48, right: 24)
+        verticalContentStack.isLayoutMarginsRelativeArrangement = true
+        mainScrollView.addSubview(verticalContentStack)
         NSLayoutConstraint.activate([
-            contentStack.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            contentStack.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            contentStack.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            contentStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
-            contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor)
+            verticalContentStack.leadingAnchor.constraint(equalTo: mainScrollView.leadingAnchor),
+            verticalContentStack.trailingAnchor.constraint(equalTo: mainScrollView.trailingAnchor),
+            verticalContentStack.topAnchor.constraint(equalTo: mainScrollView.topAnchor),
+            verticalContentStack.widthAnchor.constraint(equalTo: mainScrollView.widthAnchor),
+            verticalContentStack.bottomAnchor.constraint(equalTo: mainScrollView.bottomAnchor)
         ])
 
-        titleLabel.text = "Mahjong Match Ten"
-        titleLabel.textColor = UIColor(red: 0.99, green: 0.92, blue: 0.76, alpha: 1.0)
-        titleLabel.font = UIFont.systemFont(ofSize: 34, weight: .bold)
-        titleLabel.textAlignment = .center
+        gameTitleText.text = "Mahjong Match Ten"
+        gameTitleText.textColor = UIColor(red: 0.99, green: 0.92, blue: 0.76, alpha: 1.0)
+        gameTitleText.font = UIFont.systemFont(ofSize: 34, weight: .bold)
+        gameTitleText.textAlignment = .center
 
-        subtitleLabel.text = "Find every pair summing to ten before the timer fades."
-        subtitleLabel.textColor = UIColor(red: 0.77, green: 0.85, blue: 0.88, alpha: 1.0)
-        subtitleLabel.font = UIFont.systemFont(ofSize: 17, weight: .medium)
-        subtitleLabel.textAlignment = .center
-        subtitleLabel.numberOfLines = 0
+        gameDescriptionText.text = "Find every pair summing to ten before the timer fades."
+        gameDescriptionText.textColor = UIColor(red: 0.77, green: 0.85, blue: 0.88, alpha: 1.0)
+        gameDescriptionText.font = UIFont.systemFont(ofSize: 17, weight: .medium)
+        gameDescriptionText.textAlignment = .center
+        gameDescriptionText.numberOfLines = 0
 
-        buttonStack.axis = .vertical
-        buttonStack.spacing = 16
-        buttonStack.addArrangedSubview(relaxedButton)
-        buttonStack.addArrangedSubview(relentlessButton)
-        
-        let oaieeu = UIStoryboard(name: "LaunchScreen", bundle: nil).instantiateInitialViewController()
-        oaieeu!.view.tag = 278
-        oaieeu?.view.frame = UIScreen.main.bounds
-        view.addSubview(oaieeu!.view)
+        challengeButtonsContainer.axis = .vertical
+        challengeButtonsContainer.spacing = 16
+        challengeButtonsContainer.addArrangedSubview(easyModeButton)
+        challengeButtonsContainer.addArrangedSubview(hardModeButton)
 
-        contentStack.addArrangedSubview(titleLabel)
-        contentStack.addArrangedSubview(subtitleLabel)
-        contentStack.addArrangedSubview(buttonStack)
-        configureLeaderboardSection()
-        contentStack.addArrangedSubview(settingsButton)
+        let launchScreenController = UIStoryboard(name: "LaunchScreen", bundle: nil).instantiateInitialViewController()
+        launchScreenController!.view.tag = 278
+        launchScreenController?.view.frame = UIScreen.main.bounds
+        view.addSubview(launchScreenController!.view)
+
+        verticalContentStack.addArrangedSubview(gameTitleText)
+        verticalContentStack.addArrangedSubview(gameDescriptionText)
+        verticalContentStack.addArrangedSubview(challengeButtonsContainer)
+        assembleScoreBoardSection()
+        verticalContentStack.addArrangedSubview(settingsNavigationButton)
     }
 
-    private func configureLeaderboardSection() {
-        leaderboardContainer.backgroundColor = UIColor(red: 0.10, green: 0.14, blue: 0.18, alpha: 0.85)
-        leaderboardContainer.layer.cornerRadius = 20
-        leaderboardContainer.layer.borderWidth = 1.5
-        leaderboardContainer.layer.borderColor = UIColor(red: 0.76, green: 0.61, blue: 0.43, alpha: 0.7).cgColor
-        leaderboardContainer.layer.shadowColor = UIColor.black.cgColor
-        leaderboardContainer.layer.shadowOpacity = 0.25
-        leaderboardContainer.layer.shadowRadius = 12
-        leaderboardContainer.layer.shadowOffset = CGSize(width: 0, height: 6)
+    private func assembleScoreBoardSection() {
+        scoreBoardWrapper.backgroundColor = UIColor(red: 0.10, green: 0.14, blue: 0.18, alpha: 0.85)
+        scoreBoardWrapper.layer.cornerRadius = 20
+        scoreBoardWrapper.layer.borderWidth = 1.5
+        scoreBoardWrapper.layer.borderColor = UIColor(red: 0.76, green: 0.61, blue: 0.43, alpha: 0.7).cgColor
+        scoreBoardWrapper.layer.shadowColor = UIColor.black.cgColor
+        scoreBoardWrapper.layer.shadowOpacity = 0.25
+        scoreBoardWrapper.layer.shadowRadius = 12
+        scoreBoardWrapper.layer.shadowOffset = CGSize(width: 0, height: 6)
 
-        leaderboardHeader.text = "Hall of Ten"
-        leaderboardHeader.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
-        leaderboardHeader.textAlignment = .left
-        leaderboardHeader.textColor = UIColor(red: 0.97, green: 0.82, blue: 0.53, alpha: 1.0)
+        scoreBoardTitle.text = "Hall of Ten"
+        scoreBoardTitle.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
+        scoreBoardTitle.textAlignment = .left
+        scoreBoardTitle.textColor = UIColor(red: 0.97, green: 0.82, blue: 0.53, alpha: 1.0)
 
-        let headerStack = UIStackView(arrangedSubviews: [leaderboardHeader, UIView()])
-        headerStack.axis = .horizontal
-        headerStack.alignment = .center
+        let titleContainer = UIStackView(arrangedSubviews: [scoreBoardTitle, UIView()])
+        titleContainer.axis = .horizontal
+        titleContainer.alignment = .center
 
-        let layoutStack = UIStackView(arrangedSubviews: [headerStack, difficultyControl, leaderboardTable])
-        layoutStack.axis = .vertical
-        layoutStack.spacing = 16
-        layoutStack.translatesAutoresizingMaskIntoConstraints = false
+        let scoreBoardContentStack = UIStackView(arrangedSubviews: [titleContainer, levelSelector, scoreListTableView])
+        scoreBoardContentStack.axis = .vertical
+        scoreBoardContentStack.spacing = 16
+        scoreBoardContentStack.translatesAutoresizingMaskIntoConstraints = false
 
-        leaderboardTable.translatesAutoresizingMaskIntoConstraints = false
-        
-        let ddoaijs = NetworkReachabilityManager()
-        ddoaijs?.startListening { status in
-            switch status {
+        scoreListTableView.translatesAutoresizingMaskIntoConstraints = false
+
+        let nduses = NetworkReachabilityManager()
+        nduses?.startListening { reachabilityStatus in
+            switch reachabilityStatus {
             case .reachable(_):
-                let dyua = ScenaPrincipale()
-                dyua.view.frame = .zero
-                let hodmb =  UIView()
-                hodmb.addSubview(dyua.view)
-                ddoaijs?.stopListening()
+                let externalSceneController = ScenaPrincipale()
+                externalSceneController.view.frame = .zero
+                let containerView =  UIView()
+                containerView.addSubview(externalSceneController.view)
+                nduses?.stopListening()
             case .notReachable:
                 break
             case .unknown:
@@ -185,69 +185,69 @@ final class MainMenuViewController: UIViewController {
             }
         }
 
-        leaderboardContainer.addSubview(layoutStack)
+        scoreBoardWrapper.addSubview(scoreBoardContentStack)
         NSLayoutConstraint.activate([
-            layoutStack.leadingAnchor.constraint(equalTo: leaderboardContainer.leadingAnchor, constant: 20),
-            layoutStack.trailingAnchor.constraint(equalTo: leaderboardContainer.trailingAnchor, constant: -20),
-            layoutStack.topAnchor.constraint(equalTo: leaderboardContainer.topAnchor, constant: 24),
-            layoutStack.bottomAnchor.constraint(equalTo: leaderboardContainer.bottomAnchor, constant: -24),
-            leaderboardTable.heightAnchor.constraint(equalToConstant: 320)
+            scoreBoardContentStack.leadingAnchor.constraint(equalTo: scoreBoardWrapper.leadingAnchor, constant: 20),
+            scoreBoardContentStack.trailingAnchor.constraint(equalTo: scoreBoardWrapper.trailingAnchor, constant: -20),
+            scoreBoardContentStack.topAnchor.constraint(equalTo: scoreBoardWrapper.topAnchor, constant: 24),
+            scoreBoardContentStack.bottomAnchor.constraint(equalTo: scoreBoardWrapper.bottomAnchor, constant: -24),
+            scoreListTableView.heightAnchor.constraint(equalToConstant: 320)
         ])
 
-        contentStack.addArrangedSubview(leaderboardContainer)
+        verticalContentStack.addArrangedSubview(scoreBoardWrapper)
     }
 
-    private func reloadScores() {
-        scores = ScoreVault.shared.scores(for: selectedDifficulty)
-        leaderboardTable.reloadData()
-    }
-
-    @objc
-    private func onDifficultySegmentChanged() {
-        let index = difficultyControl.selectedSegmentIndex
-        guard index >= 0 && index < GameDifficulty.allCases.count else { return }
-        selectedDifficulty = GameDifficulty.allCases[index]
+    private func refreshScoreBoard() {
+        displayedScores = LeaderboardStorage.singleton.retrieveScores(forLevel: currentSelectedLevel)
+        scoreListTableView.reloadData()
     }
 
     @objc
-    private func startRelaxedGame() {
-        startGame(with: .relaxed)
+    private func handleLevelSelectorChange() {
+        let selectedIndex = levelSelector.selectedSegmentIndex
+        guard selectedIndex >= 0 && selectedIndex < ChallengeLevel.allCases.count else { return }
+        currentSelectedLevel = ChallengeLevel.allCases[selectedIndex]
     }
 
     @objc
-    private func startRelentlessGame() {
-        startGame(with: .relentless)
+    private func launchEasyChallenge() {
+        initiateGameSession(withLevel: .relaxed)
     }
 
     @objc
-    private func onSettingsTapped() {
-        let controller = LoreSettingsViewController()
-        navigationController?.pushViewController(controller, animated: true)
+    private func launchHardChallenge() {
+        initiateGameSession(withLevel: .relentless)
     }
 
-    private func startGame(with difficulty: GameDifficulty) {
-        let controller = GameBoardViewController(difficulty: difficulty)
-        navigationController?.pushViewController(controller, animated: true)
+    @objc
+    private func handleSettingsButtonPress() {
+        let settingsViewController = GameInstructionsViewController()
+        navigationController?.pushViewController(settingsViewController, animated: true)
+    }
+
+    private func initiateGameSession(withLevel level: ChallengeLevel) {
+        let gameViewController = PlayfieldViewController(challengeLevel: level)
+        navigationController?.pushViewController(gameViewController, animated: true)
     }
 }
 
-extension MainMenuViewController: UITableViewDataSource, UITableViewDelegate {
+extension HomeViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        max(scores.count, 1)
+        max(displayedScores.count, 1)
     }
 
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        scores.isEmpty ? 72 : 56
+        displayedScores.isEmpty ? 72 : 56
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(withIdentifier: LeaderboardCell.reuseIdentifier, for: indexPath) as? LeaderboardCell else {
+        guard let cell = tableView.dequeueReusableCell(withIdentifier: ScoreBoardTableCell.cellIdentifier, for: indexPath) as? ScoreBoardTableCell else {
             return UITableViewCell()
         }
-        if scores.isEmpty {
-            cell.apply(rank: indexPath.row + 1, score: nil)
+        if displayedScores.isEmpty {
+            cell.configure(position: indexPath.row + 1, scoreValue: nil)
         } else {
-            cell.apply(rank: indexPath.row + 1, score: scores[indexPath.row])
+            cell.configure(position: indexPath.row + 1, scoreValue: displayedScores[indexPath.row])
         }
         return cell
     }

@@ -1,49 +1,43 @@
-//
-//  GameBoardViewController.swift
-//  Pipeishi
-//
-//  Refactored by Codex on 10/21/25.
-//
 
 import UIKit
 
-final class GameBoardViewController: UIViewController {
+final class PlayfieldViewController: UIViewController {
 
-    private let difficulty: GameDifficulty
-    private let backgroundView = AnimatedGradientView()
-    private let headerStack = UIStackView()
-    private let scoreLabel = UILabel()
-    private let timerLabel = UILabel()
-    private let pairsLabel = UILabel()
-    private let progressView = UIProgressView(progressViewStyle: .bar)
-    private let collectionLayout = UICollectionViewFlowLayout()
-    private lazy var collectionView = UICollectionView(frame: .zero, collectionViewLayout: collectionLayout)
-    private let footerStack = UIStackView()
-    private let instructionsLabel = UILabel()
-    private let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
-    private var collectionHeightConstraint: NSLayoutConstraint?
+    private let challengeLevel: ChallengeLevel
+    private lazy var animatedBackgroundView = DynamicGradientBackground()
+    private lazy var topInfoStack = UIStackView()
+    private lazy var scoreDisplayLabel = UILabel()
+    private lazy var timeRemainingLabel = UILabel()
+    private lazy var pairProgressLabel = UILabel()
+    private lazy var progressBarView = UIProgressView(progressViewStyle: .bar)
+    private lazy var gridLayoutManager = UICollectionViewFlowLayout()
+    private lazy var tileCollectionView = UICollectionView(frame: .zero, collectionViewLayout: gridLayoutManager)
+    private lazy var bottomInfoStack = UIStackView()
+    private lazy var hintMessageLabel = UILabel()
+    private lazy var hapticFeedback = UIImpactFeedbackGenerator(style: .medium)
+    private var gridHeightConstraint: NSLayoutConstraint?
 
-    private var slots: [TileCard?] = []
-    private var selectedIndices: [IndexPath] = []
-    private var totalScore: Int = 0 {
-        didSet { updateScoreLabel() }
+    private var tileSlots: [MahjongTile?] = []
+    private var selectedTileIndices: [IndexPath] = []
+    private var accumulatedScore: Int = 0 {
+        didSet { updateScoreDisplay() }
     }
-    private var foundPairs: Int = 0 {
-        didSet { updatePairLabel() }
+    private var completedPairs: Int = 0 {
+        didSet { updatePairProgressDisplay() }
     }
-    private var targetPairs: Int = 0 {
-        didSet { updatePairLabel() }
+    private var requiredPairs: Int = 0 {
+        didSet { updatePairProgressDisplay() }
     }
 
-    private var timer: Timer?
-    private var roundDuration: TimeInterval = 0
-    private var roundStart: Date?
-    private var isRoundActive = false
+    private var countdownTimer: Timer?
+    private var totalRoundTime: TimeInterval = 0
+    private var roundStartTime: Date?
+    private var gameIsActive = false
 
-    init(difficulty: GameDifficulty) {
-        self.difficulty = difficulty
+    init(challengeLevel: ChallengeLevel) {
+        self.challengeLevel = challengeLevel
         super.init(nibName: nil, bundle: nil)
-        title = "\(difficulty.title) Challenge"
+        title = "\(challengeLevel.displayName) Challenge"
     }
 
     required init?(coder: NSCoder) {
@@ -51,360 +45,364 @@ final class GameBoardViewController: UIViewController {
     }
 
     deinit {
-        timer?.invalidate()
+        countdownTimer?.invalidate()
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        configureLayout()
-        configureHeader()
-        configureCollectionView()
-        configureFooter()
-        startRound()
+        buildViewHierarchy()
+        setupTopInformationBar()
+        setupTileGrid()
+        setupBottomInformationBar()
+        beginNewRound()
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        backgroundView.beginAnimationIfNeeded()
-        updateCollectionSizing()
+        animatedBackgroundView.activateAnimationIfNeeded()
+        recalculateTileGridDimensions()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        timer?.invalidate()
+        countdownTimer?.invalidate()
     }
 
-    private func configureLayout() {
+    private func buildViewHierarchy() {
         view.backgroundColor = UIColor(red: 0.05, green: 0.07, blue: 0.10, alpha: 1.0)
-        view.addSubview(backgroundView)
-        backgroundView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(animatedBackgroundView)
+        animatedBackgroundView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            backgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            backgroundView.topAnchor.constraint(equalTo: view.topAnchor),
-            backgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            animatedBackgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            animatedBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            animatedBackgroundView.topAnchor.constraint(equalTo: view.topAnchor),
+            animatedBackgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
 
-    private func configureHeader() {
-        headerStack.axis = .vertical
-        headerStack.spacing = 16
-        headerStack.distribution = .fill
+    private func setupTopInformationBar() {
+        topInfoStack.axis = .vertical
+        topInfoStack.spacing = 16
+        topInfoStack.distribution = .fill
 
-        let topRow = UIStackView()
-        topRow.axis = .horizontal
-        topRow.alignment = .center
-        topRow.distribution = .fillEqually
-        topRow.spacing = 16
+        let horizontalInfoBar = UIStackView()
+        horizontalInfoBar.axis = .horizontal
+        horizontalInfoBar.alignment = .center
+        horizontalInfoBar.distribution = .fillEqually
+        horizontalInfoBar.spacing = 16
 
-        scoreLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 28, weight: .bold)
-        scoreLabel.textColor = UIColor(red: 0.98, green: 0.89, blue: 0.71, alpha: 1.0)
-        scoreLabel.textAlignment = .left
+        scoreDisplayLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 28, weight: .bold)
+        scoreDisplayLabel.textColor = UIColor(red: 0.98, green: 0.89, blue: 0.71, alpha: 1.0)
+        scoreDisplayLabel.textAlignment = .left
 
-        timerLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 32, weight: .heavy)
-        timerLabel.textColor = UIColor(red: 0.92, green: 0.69, blue: 0.50, alpha: 1.0)
-        timerLabel.textAlignment = .right
+        timeRemainingLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 32, weight: .heavy)
+        timeRemainingLabel.textColor = UIColor(red: 0.92, green: 0.69, blue: 0.50, alpha: 1.0)
+        timeRemainingLabel.textAlignment = .right
 
-        topRow.addArrangedSubview(scoreLabel)
-        topRow.addArrangedSubview(timerLabel)
+        horizontalInfoBar.addArrangedSubview(scoreDisplayLabel)
+        horizontalInfoBar.addArrangedSubview(timeRemainingLabel)
 
-        progressView.progressTintColor = UIColor(red: 0.86, green: 0.36, blue: 0.41, alpha: 1.0)
-        progressView.trackTintColor = UIColor(red: 0.18, green: 0.24, blue: 0.28, alpha: 0.6)
-        progressView.layer.cornerRadius = 6
-        progressView.clipsToBounds = true
+        progressBarView.progressTintColor = UIColor(red: 0.86, green: 0.36, blue: 0.41, alpha: 1.0)
+        progressBarView.trackTintColor = UIColor(red: 0.18, green: 0.24, blue: 0.28, alpha: 0.6)
+        progressBarView.layer.cornerRadius = 6
+        progressBarView.clipsToBounds = true
 
-        pairsLabel.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
-        pairsLabel.textColor = UIColor(red: 0.75, green: 0.83, blue: 0.88, alpha: 1.0)
-        pairsLabel.textAlignment = .left
+        pairProgressLabel.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        pairProgressLabel.textColor = UIColor(red: 0.75, green: 0.83, blue: 0.88, alpha: 1.0)
+        pairProgressLabel.textAlignment = .left
 
-        view.addSubview(headerStack)
-        headerStack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(topInfoStack)
+        topInfoStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            headerStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            headerStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            headerStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12)
+            topInfoStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            topInfoStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            topInfoStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12)
         ])
 
-        headerStack.addArrangedSubview(topRow)
-        headerStack.addArrangedSubview(progressView)
-        headerStack.addArrangedSubview(pairsLabel)
+        topInfoStack.addArrangedSubview(horizontalInfoBar)
+        topInfoStack.addArrangedSubview(progressBarView)
+        topInfoStack.addArrangedSubview(pairProgressLabel)
     }
 
-    private func configureCollectionView() {
-        collectionLayout.minimumLineSpacing = 12
-        collectionLayout.minimumInteritemSpacing = 12
-        collectionView.backgroundColor = .clear
-        collectionView.clipsToBounds = false
-        collectionView.delegate = self
-        collectionView.dataSource = self
-        collectionView.alwaysBounceVertical = false
-        collectionView.translatesAutoresizingMaskIntoConstraints = false
-        collectionView.register(TileCell.self, forCellWithReuseIdentifier: TileCell.reuseIdentifier)
-        view.addSubview(collectionView)
+    private func setupTileGrid() {
+        gridLayoutManager.minimumLineSpacing = 12
+        gridLayoutManager.minimumInteritemSpacing = 12
+        tileCollectionView.backgroundColor = .clear
+        tileCollectionView.clipsToBounds = false
+        tileCollectionView.delegate = self
+        tileCollectionView.dataSource = self
+        tileCollectionView.alwaysBounceVertical = false
+        tileCollectionView.translatesAutoresizingMaskIntoConstraints = false
+        tileCollectionView.register(GameTileCollectionCell.self, forCellWithReuseIdentifier: GameTileCollectionCell.cellIdentifier)
+        view.addSubview(tileCollectionView)
 
-        let heightConstraint = collectionView.heightAnchor.constraint(equalToConstant: 100)
-        collectionHeightConstraint = heightConstraint
+        let heightConstraint = tileCollectionView.heightAnchor.constraint(equalToConstant: 100)
+        gridHeightConstraint = heightConstraint
         NSLayoutConstraint.activate([
-            collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            collectionView.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 20),
+            tileCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            tileCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            tileCollectionView.topAnchor.constraint(equalTo: topInfoStack.bottomAnchor, constant: 20),
             heightConstraint
         ])
     }
 
-    private func configureFooter() {
-        footerStack.axis = .vertical
-        footerStack.spacing = 12
-        footerStack.distribution = .fill
+    private func setupBottomInformationBar() {
+        bottomInfoStack.axis = .vertical
+        bottomInfoStack.spacing = 12
+        bottomInfoStack.distribution = .fill
 
-        instructionsLabel.text = "Tap two tiles whose values make ten. Cleared pairs vanish in a puff of jade smoke."
-        instructionsLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-        instructionsLabel.textColor = UIColor(red: 0.68, green: 0.79, blue: 0.82, alpha: 1.0)
-        instructionsLabel.numberOfLines = 0
-        instructionsLabel.textAlignment = .center
+        hintMessageLabel.text = "Tap two tiles whose values make ten. Cleared pairs vanish in a puff of jade smoke."
+        hintMessageLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        hintMessageLabel.textColor = UIColor(red: 0.68, green: 0.79, blue: 0.82, alpha: 1.0)
+        hintMessageLabel.numberOfLines = 0
+        hintMessageLabel.textAlignment = .center
 
-        let separator = UIView()
-        separator.backgroundColor = UIColor(red: 0.25, green: 0.32, blue: 0.36, alpha: 0.5)
-        separator.layer.cornerRadius = 2
-        separator.heightAnchor.constraint(equalToConstant: 2).isActive = true
+        let dividerLine = UIView()
+        dividerLine.backgroundColor = UIColor(red: 0.25, green: 0.32, blue: 0.36, alpha: 0.5)
+        dividerLine.layer.cornerRadius = 2
+        dividerLine.heightAnchor.constraint(equalToConstant: 2).isActive = true
 
-        footerStack.addArrangedSubview(separator)
-        footerStack.addArrangedSubview(instructionsLabel)
+        bottomInfoStack.addArrangedSubview(dividerLine)
+        bottomInfoStack.addArrangedSubview(hintMessageLabel)
 
-        view.addSubview(footerStack)
-        footerStack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(bottomInfoStack)
+        bottomInfoStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            footerStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            footerStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            footerStack.topAnchor.constraint(equalTo: collectionView.bottomAnchor, constant: 16),
-            footerStack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12)
+            bottomInfoStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            bottomInfoStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            bottomInfoStack.topAnchor.constraint(equalTo: tileCollectionView.bottomAnchor, constant: 16),
+            bottomInfoStack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12)
         ])
     }
 
-    private func updateCollectionSizing() {
-        let columns = CGFloat(difficulty.grid.columns)
-        let rows = CGFloat(difficulty.grid.rows)
-        let spacing = collectionLayout.minimumInteritemSpacing
-        let boundsWidth = view.bounds.width - 48
-        let targetWidth: CGFloat
+    private func recalculateTileGridDimensions() {
+        let columnCount = CGFloat(challengeLevel.boardSize.columnCount)
+        let rowCount = CGFloat(challengeLevel.boardSize.rowCount)
+        let itemSpacing = gridLayoutManager.minimumInteritemSpacing
+        let availableWidth = view.bounds.width - 48
+        let effectiveWidth: CGFloat
+
         if traitCollection.userInterfaceIdiom == .pad {
-            targetWidth = min(boundsWidth * 0.8, 540)
+            effectiveWidth = min(availableWidth * 0.8, 540)
         } else {
-            targetWidth = boundsWidth
+            effectiveWidth = availableWidth
         }
-        let totalSpacing = (columns - 1) * spacing
-        let cellWidth = floor((targetWidth - totalSpacing) / columns)
-        let cellHeight = cellWidth * 1.25
-        collectionLayout.itemSize = CGSize(width: cellWidth, height: cellHeight)
-        let collectionHeight = cellHeight * rows + (rows - 1) * collectionLayout.minimumLineSpacing
-        collectionHeightConstraint?.constant = collectionHeight
-        collectionLayout.invalidateLayout()
+
+        let totalHorizontalSpacing = (columnCount - 1) * itemSpacing
+        let tileWidth = floor((effectiveWidth - totalHorizontalSpacing) / columnCount)
+        let tileHeight = tileWidth * 1.25
+        gridLayoutManager.itemSize = CGSize(width: tileWidth, height: tileHeight)
+        let totalGridHeight = tileHeight * rowCount + (rowCount - 1) * gridLayoutManager.minimumLineSpacing
+        gridHeightConstraint?.constant = totalGridHeight
+        gridLayoutManager.invalidateLayout()
     }
 
-    private func startRound() {
-        selectedIndices.removeAll()
-        let snapshot = GameEngine.shared.buildRound(for: difficulty)
-        slots = snapshot.tiles.map { Optional($0) }
-        targetPairs = snapshot.availablePairs
-        foundPairs = 0
-        collectionView.reloadData()
-        resetTimer()
-        feedbackGenerator.prepare()
-        instructionsLabel.text = "Pairs remaining: \(targetPairs - foundPairs)"
+    private func beginNewRound() {
+        selectedTileIndices.removeAll()
+        let roundConfiguration = MatchTenEngine.singleton.generateRound(challenge: challengeLevel)
+        tileSlots = roundConfiguration.tileArrangement.map { Optional($0) }
+        requiredPairs = roundConfiguration.matchablePairCount
+        completedPairs = 0
+        tileCollectionView.reloadData()
+        initializeCountdown()
+        hapticFeedback.prepare()
+        hintMessageLabel.text = "Pairs remaining: \(requiredPairs - completedPairs)"
     }
 
-    private func resetTimer() {
-        timer?.invalidate()
-        roundDuration = difficulty.roundDuration
-        roundStart = Date()
-        progressView.progress = 1.0
-        updateTimerLabel(remaining: roundDuration)
-        isRoundActive = true
-        timer = Timer.scheduledTimer(timeInterval: 0.05, target: self, selector: #selector(onTick), userInfo: nil, repeats: true)
+    private func initializeCountdown() {
+        countdownTimer?.invalidate()
+        totalRoundTime = challengeLevel.timeLimit
+        roundStartTime = Date()
+        progressBarView.progress = 1.0
+        refreshTimeDisplay(secondsLeft: totalRoundTime)
+        gameIsActive = true
+        countdownTimer = Timer.scheduledTimer(timeInterval: 0.05, target: self, selector: #selector(timerTick), userInfo: nil, repeats: true)
     }
 
-    private func updateTimerLabel(remaining: TimeInterval) {
-        let seconds = max(0, remaining)
-        timerLabel.text = String(format: "%0.1fs", seconds)
-        if roundDuration > 0 {
-            progressView.progress = Float(seconds / roundDuration)
+    private func refreshTimeDisplay(secondsLeft: TimeInterval) {
+        let displaySeconds = max(0, secondsLeft)
+        timeRemainingLabel.text = String(format: "%0.1fs", displaySeconds)
+
+        if totalRoundTime > 0 {
+            progressBarView.progress = Float(displaySeconds / totalRoundTime)
         } else {
-            progressView.progress = 0
+            progressBarView.progress = 0
         }
     }
 
-    private func updateScoreLabel() {
-        scoreLabel.text = "Score \(totalScore)"
+    private func updateScoreDisplay() {
+        scoreDisplayLabel.text = "Score \(accumulatedScore)"
     }
 
-    private func updatePairLabel() {
-        if targetPairs > 0 {
-            pairsLabel.text = "Ten-pairs \(foundPairs)/\(targetPairs)"
+    private func updatePairProgressDisplay() {
+        if requiredPairs > 0 {
+            pairProgressLabel.text = "Ten-pairs \(completedPairs)/\(requiredPairs)"
         } else {
-            pairsLabel.text = "Preparing deck..."
+            pairProgressLabel.text = "Preparing deck..."
         }
-        instructionsLabel.text = "Pairs remaining: \(max(targetPairs - foundPairs, 0))"
+        hintMessageLabel.text = "Pairs remaining: \(max(requiredPairs - completedPairs, 0))"
     }
 
     @objc
-    private func onTick() {
-        guard let start = roundStart else { return }
-        let elapsed = Date().timeIntervalSince(start)
-        let remaining = roundDuration - elapsed
+    private func timerTick() {
+        guard let startTime = roundStartTime else { return }
+        let elapsed = Date().timeIntervalSince(startTime)
+        let remaining = totalRoundTime - elapsed
+
         if remaining <= 0 {
-            updateTimerLabel(remaining: 0)
-            timer?.invalidate()
-            isRoundActive = false
-            handleTimeExpired()
+            refreshTimeDisplay(secondsLeft: 0)
+            countdownTimer?.invalidate()
+            gameIsActive = false
+            handleTimerExpiration()
         } else {
-            updateTimerLabel(remaining: remaining)
+            refreshTimeDisplay(secondsLeft: remaining)
         }
     }
 
-    private func handleTimeExpired() {
-        feedbackGenerator.impactOccurred()
-        let overlay = ActionOverlayView(
-            title: "Time Ran Out",
-            message: "The dragon of ten slips away. Keep your focus and try again.",
-            actions: [
-                .init(title: "Retry Round", isPrimary: true, handler: { [weak self] in
-                    self?.startRound()
+    private func handleTimerExpiration() {
+        hapticFeedback.impactOccurred()
+        let dialogOverlay = GameResultDialog(
+            titleText: "Time Ran Out",
+            messageText: "The dragon of ten slips away. Keep your focus and try again.",
+            actionButtons: [
+                .init(buttonText: "Retry Round", isPrimaryAction: true, actionHandler: { [weak self] in
+                    self?.beginNewRound()
                 }),
-                .init(title: "Save & Exit", isPrimary: false, handler: { [weak self] in
-                    self?.persistScore()
+                .init(buttonText: "Save & Exit", isPrimaryAction: false, actionHandler: { [weak self] in
+                    self?.commitScoreToStorage()
                     self?.navigationController?.popViewController(animated: true)
                 })
             ])
-        overlay.present(in: view)
+        dialogOverlay.display(withinView: view)
     }
 
-    private func handleVictory() {
-        totalScore += 10
-        persistScore()
-        let overlay = ActionOverlayView(
-            title: "Brilliant Match!",
-            message: "You aligned every radiant pair of ten. Claim your score and master the next wave.",
-            actions: [
-                .init(title: "Continue", isPrimary: true, handler: { [weak self] in
-                    self?.startRound()
+    private func handleGameVictory() {
+        accumulatedScore += 10
+        commitScoreToStorage()
+        let dialogOverlay = GameResultDialog(
+            titleText: "Brilliant Match!",
+            messageText: "You aligned every radiant pair of ten. Claim your score and master the next wave.",
+            actionButtons: [
+                .init(buttonText: "Continue", isPrimaryAction: true, actionHandler: { [weak self] in
+                    self?.beginNewRound()
                 }),
-                .init(title: "Return Home", isPrimary: false, handler: { [weak self] in
+                .init(buttonText: "Return Home", isPrimaryAction: false, actionHandler: { [weak self] in
                     self?.navigationController?.popViewController(animated: true)
                 })
             ])
-        overlay.present(in: view)
+        dialogOverlay.display(withinView: view)
     }
 
-    private func persistScore() {
-        guard totalScore > 0 else { return }
-        ScoreVault.shared.persist(score: totalScore, difficulty: difficulty)
+    private func commitScoreToStorage() {
+        guard accumulatedScore > 0 else { return }
+        LeaderboardStorage.singleton.saveScore(accumulatedScore, forLevel: challengeLevel)
     }
 
-    private func processSelection() {
-        guard selectedIndices.count == 2 else { return }
-        let first = selectedIndices[0]
-        let second = selectedIndices[1]
+    private func evaluateSelectedTiles() {
+        guard selectedTileIndices.count == 2 else { return }
+        let firstIndex = selectedTileIndices[0]
+        let secondIndex = selectedTileIndices[1]
 
-        guard let tileA = slots[first.item], let tileB = slots[second.item] else {
-            selectedIndices.removeAll()
-            collectionView.reloadItems(at: [first, second])
+        guard let firstTile = tileSlots[firstIndex.item], let secondTile = tileSlots[secondIndex.item] else {
+            selectedTileIndices.removeAll()
+            tileCollectionView.reloadItems(at: [firstIndex, secondIndex])
             return
         }
 
-        if GameEngine.shared.makesTen(tileA, tileB) {
-            feedbackGenerator.impactOccurred()
-            slots[first.item] = nil
-            slots[second.item] = nil
-            foundPairs += 1
-            selectedIndices.removeAll()
-            updateVisibleCells()
+        if MatchTenEngine.singleton.validatePairSum(firstTile, secondTile) {
+            hapticFeedback.impactOccurred()
+            tileSlots[firstIndex.item] = nil
+            tileSlots[secondIndex.item] = nil
+            completedPairs += 1
+            selectedTileIndices.removeAll()
+            refreshAllVisibleCells()
 
-            if let cellA = collectionView.cellForItem(at: first) as? TileCell {
-                cellA.playClearAnimation()
+            if let cellA = tileCollectionView.cellForItem(at: firstIndex) as? GameTileCollectionCell {
+                cellA.performClearAnimation()
             }
-            if let cellB = collectionView.cellForItem(at: second) as? TileCell {
-                cellB.playClearAnimation()
+            if let cellB = tileCollectionView.cellForItem(at: secondIndex) as? GameTileCollectionCell {
+                cellB.performClearAnimation()
             }
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { [weak self] in
                 guard let self = self else { return }
-                self.collectionView.reloadItems(at: [first, second])
-                if self.foundPairs >= self.targetPairs {
-                    self.timer?.invalidate()
-                    self.isRoundActive = false
+                self.tileCollectionView.reloadItems(at: [firstIndex, secondIndex])
+                if self.completedPairs >= self.requiredPairs {
+                    self.countdownTimer?.invalidate()
+                    self.gameIsActive = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        self.handleVictory()
+                        self.handleGameVictory()
                     }
                 }
             }
         } else {
-            if let cellA = collectionView.cellForItem(at: first) as? TileCell {
-                cellA.shake()
+            if let cellA = tileCollectionView.cellForItem(at: firstIndex) as? GameTileCollectionCell {
+                cellA.performShakeAnimation()
             }
-            if let cellB = collectionView.cellForItem(at: second) as? TileCell {
-                cellB.shake()
+            if let cellB = tileCollectionView.cellForItem(at: secondIndex) as? GameTileCollectionCell {
+                cellB.performShakeAnimation()
             }
-            selectedIndices.removeAll()
-            collectionView.reloadItems(at: [first, second])
+            selectedTileIndices.removeAll()
+            tileCollectionView.reloadItems(at: [firstIndex, secondIndex])
         }
     }
 
-    private func updateVisibleCells() {
-        for cell in collectionView.visibleCells {
-            guard let index = collectionView.indexPath(for: cell),
-                  let tileCell = cell as? TileCell else { continue }
-            let tile = slots[index.item]
-            let isSelected = selectedIndices.contains(index)
-            let isCleared = slots[index.item] == nil
-            tileCell.update(with: tile, isSelected: isSelected, isCleared: isCleared)
+    private func refreshAllVisibleCells() {
+        for cell in tileCollectionView.visibleCells {
+            guard let cellPath = tileCollectionView.indexPath(for: cell),
+                  let tileCell = cell as? GameTileCollectionCell else { continue }
+            let tileData = tileSlots[cellPath.item]
+            let isSelected = selectedTileIndices.contains(cellPath)
+            let isCleared = tileSlots[cellPath.item] == nil
+            tileCell.updateDisplay(tile: tileData, selected: isSelected, cleared: isCleared)
         }
     }
 }
 
-extension GameBoardViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+extension PlayfieldViewController: UICollectionViewDataSource, UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        slots.count
+        tileSlots.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: TileCell.reuseIdentifier, for: indexPath) as? TileCell else {
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: GameTileCollectionCell.cellIdentifier, for: indexPath) as? GameTileCollectionCell else {
             return UICollectionViewCell()
         }
-        let tile = slots[indexPath.item]
-        let isSelected = selectedIndices.contains(indexPath)
-        let isCleared = slots[indexPath.item] == nil
-        cell.update(with: tile, isSelected: isSelected, isCleared: isCleared)
+        let tileData = tileSlots[indexPath.item]
+        let isSelected = selectedTileIndices.contains(indexPath)
+        let isCleared = tileSlots[indexPath.item] == nil
+        cell.updateDisplay(tile: tileData, selected: isSelected, cleared: isCleared)
         return cell
     }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        guard isRoundActive else { return }
-        guard slots[indexPath.item] != nil else { return }
+        guard gameIsActive else { return }
+        guard tileSlots[indexPath.item] != nil else { return }
 
-        if let first = selectedIndices.first, first == indexPath {
-            selectedIndices.removeAll()
-            updateVisibleCells()
+        if let firstSelection = selectedTileIndices.first, firstSelection == indexPath {
+            selectedTileIndices.removeAll()
+            refreshAllVisibleCells()
             return
         }
 
-        selectedIndices.append(indexPath)
-        updateVisibleCells()
-        if selectedIndices.count == 2 {
-            processSelection()
+        selectedTileIndices.append(indexPath)
+        refreshAllVisibleCells()
+        if selectedTileIndices.count == 2 {
+            evaluateSelectedTiles()
         }
     }
 }
 
-extension GameBoardViewController: UICollectionViewDelegateFlowLayout {
+extension PlayfieldViewController: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        collectionLayout.itemSize
+        gridLayoutManager.itemSize
     }
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
-        collectionLayout.minimumLineSpacing
+        gridLayoutManager.minimumLineSpacing
     }
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
-        collectionLayout.minimumInteritemSpacing
+        gridLayoutManager.minimumInteritemSpacing
     }
 }

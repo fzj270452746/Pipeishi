@@ -1,25 +1,19 @@
-//
-//  ControlSensitiveScrollView.swift
-//  Pipeishi
-//
-//  Refactored by Codex on 10/21/25.
-//
 
 import UIKit
 
-final class ControlSensitiveScrollView: UIScrollView {
+final class TouchOptimizedScrollView: UIScrollView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        configure()
+        applyTouchSettings()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        configure()
+        applyTouchSettings()
     }
 
-    private func configure() {
+    private func applyTouchSettings() {
         delaysContentTouches = false
         canCancelContentTouches = true
     }

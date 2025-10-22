@@ -1,38 +1,32 @@
-//
-//  ActionOverlayView.swift
-//  Pipeishi
-//
-//  Refactored by Codex on 10/21/25.
-//
 
 import UIKit
 
-final class ActionOverlayView: UIView {
+final class GameResultDialog: UIView {
 
-    struct Action {
-        let title: String
-        let isPrimary: Bool
-        let handler: (() -> Void)?
+    struct DialogAction {
+        let buttonText: String
+        let isPrimaryAction: Bool
+        let actionHandler: (() -> Void)?
     }
 
-    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
-    private let container = UIView()
-    private let titleLabel = UILabel()
-    private let messageLabel = UILabel()
-    private let buttonStack = UIStackView()
-    private var actions: [Action] = []
+    private lazy var blurBackdropView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+    private lazy var dialogContainer = UIView()
+    private lazy var dialogTitleLabel = UILabel()
+    private lazy var dialogMessageLabel = UILabel()
+    private lazy var actionButtonStack = UIStackView()
+    private var configuredActions: [DialogAction] = []
 
-    init(title: String, message: String, actions: [Action]) {
-        self.actions = actions
+    init(titleText: String, messageText: String, actionButtons: [DialogAction]) {
+        self.configuredActions = actionButtons
         super.init(frame: .zero)
-        configure(title: title, message: message)
+        assembleDialog(titleText: titleText, messageText: messageText)
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
     }
 
-    func present(in hostView: UIView) {
+    func display(withinView hostView: UIView) {
         hostView.addSubview(self)
         translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -50,7 +44,7 @@ final class ActionOverlayView: UIView {
         }
     }
 
-    func dismiss() {
+    func hide() {
         UIView.animate(withDuration: 0.2, animations: {
             self.alpha = 0
         }, completion: { _ in
@@ -58,93 +52,93 @@ final class ActionOverlayView: UIView {
         })
     }
 
-    private func configure(title: String, message: String) {
+    private func assembleDialog(titleText: String, messageText: String) {
         backgroundColor = UIColor.black.withAlphaComponent(0.45)
-        addSubview(blurView)
-        blurView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(blurBackdropView)
+        blurBackdropView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            blurView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            blurView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            blurView.topAnchor.constraint(equalTo: topAnchor),
-            blurView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            blurBackdropView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            blurBackdropView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            blurBackdropView.topAnchor.constraint(equalTo: topAnchor),
+            blurBackdropView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
 
-        container.backgroundColor = UIColor(red: 0.12, green: 0.17, blue: 0.22, alpha: 0.96)
-        container.layer.cornerRadius = 24
-        container.layer.borderWidth = 1.6
-        container.layer.borderColor = UIColor(red: 0.78, green: 0.62, blue: 0.38, alpha: 0.8).cgColor
-        addSubview(container)
-        container.translatesAutoresizingMaskIntoConstraints = false
+        dialogContainer.backgroundColor = UIColor(red: 0.12, green: 0.17, blue: 0.22, alpha: 0.96)
+        dialogContainer.layer.cornerRadius = 24
+        dialogContainer.layer.borderWidth = 1.6
+        dialogContainer.layer.borderColor = UIColor(red: 0.78, green: 0.62, blue: 0.38, alpha: 0.8).cgColor
+        addSubview(dialogContainer)
+        dialogContainer.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            container.centerXAnchor.constraint(equalTo: centerXAnchor),
-            container.centerYAnchor.constraint(equalTo: centerYAnchor),
-            container.widthAnchor.constraint(equalTo: widthAnchor, multiplier: traitCollection.userInterfaceIdiom == .pad ? 0.45 : 0.8)
+            dialogContainer.centerXAnchor.constraint(equalTo: centerXAnchor),
+            dialogContainer.centerYAnchor.constraint(equalTo: centerYAnchor),
+            dialogContainer.widthAnchor.constraint(equalTo: widthAnchor, multiplier: traitCollection.userInterfaceIdiom == .pad ? 0.45 : 0.8)
         ])
 
-        titleLabel.text = title
-        titleLabel.font = UIFont.systemFont(ofSize: 24, weight: .bold)
-        titleLabel.textColor = UIColor(red: 0.98, green: 0.91, blue: 0.73, alpha: 1.0)
-        titleLabel.textAlignment = .center
-        titleLabel.numberOfLines = 2
+        dialogTitleLabel.text = titleText
+        dialogTitleLabel.font = UIFont.systemFont(ofSize: 24, weight: .bold)
+        dialogTitleLabel.textColor = UIColor(red: 0.98, green: 0.91, blue: 0.73, alpha: 1.0)
+        dialogTitleLabel.textAlignment = .center
+        dialogTitleLabel.numberOfLines = 2
 
-        messageLabel.text = message
-        messageLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
-        messageLabel.textColor = UIColor(red: 0.77, green: 0.85, blue: 0.88, alpha: 1.0)
-        messageLabel.textAlignment = .center
-        messageLabel.numberOfLines = 0
+        dialogMessageLabel.text = messageText
+        dialogMessageLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        dialogMessageLabel.textColor = UIColor(red: 0.77, green: 0.85, blue: 0.88, alpha: 1.0)
+        dialogMessageLabel.textAlignment = .center
+        dialogMessageLabel.numberOfLines = 0
 
-        buttonStack.axis = .vertical
-        buttonStack.spacing = 12
+        actionButtonStack.axis = .vertical
+        actionButtonStack.spacing = 12
 
-        let contentStack = UIStackView(arrangedSubviews: [titleLabel, messageLabel, buttonStack])
-        contentStack.axis = .vertical
-        contentStack.spacing = 20
-        contentStack.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(contentStack)
+        let dialogContentStack = UIStackView(arrangedSubviews: [dialogTitleLabel, dialogMessageLabel, actionButtonStack])
+        dialogContentStack.axis = .vertical
+        dialogContentStack.spacing = 20
+        dialogContentStack.translatesAutoresizingMaskIntoConstraints = false
+        dialogContainer.addSubview(dialogContentStack)
         NSLayoutConstraint.activate([
-            contentStack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 24),
-            contentStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -24),
-            contentStack.topAnchor.constraint(equalTo: container.topAnchor, constant: 28),
-            contentStack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -28)
+            dialogContentStack.leadingAnchor.constraint(equalTo: dialogContainer.leadingAnchor, constant: 24),
+            dialogContentStack.trailingAnchor.constraint(equalTo: dialogContainer.trailingAnchor, constant: -24),
+            dialogContentStack.topAnchor.constraint(equalTo: dialogContainer.topAnchor, constant: 28),
+            dialogContentStack.bottomAnchor.constraint(equalTo: dialogContainer.bottomAnchor, constant: -28)
         ])
 
-        configureButtons()
+        populateActionButtons()
     }
 
-    private func configureButtons() {
-        guard !actions.isEmpty else { return }
-        buttonStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+    private func populateActionButtons() {
+        guard !configuredActions.isEmpty else { return }
+        actionButtonStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
-        for (index, action) in actions.enumerated() {
-            let button = UIButton(type: .system)
-            button.layer.cornerRadius = 16
-            button.heightAnchor.constraint(equalToConstant: 52).isActive = true
-            button.setTitle(action.title, for: .normal)
-            button.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
-            button.addTarget(self, action: #selector(onButtonTap(_:)), for: .touchUpInside)
-            button.tag = index
+        for (buttonIndex, action) in configuredActions.enumerated() {
+            let actionButton = UIButton(type: .system)
+            actionButton.layer.cornerRadius = 16
+            actionButton.heightAnchor.constraint(equalToConstant: 52).isActive = true
+            actionButton.setTitle(action.buttonText, for: .normal)
+            actionButton.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
+            actionButton.addTarget(self, action: #selector(handleButtonPress(_:)), for: .touchUpInside)
+            actionButton.tag = buttonIndex
 
-            if action.isPrimary {
-                button.backgroundColor = UIColor(red: 0.86, green: 0.34, blue: 0.34, alpha: 1.0)
-                button.setTitleColor(.white, for: .normal)
+            if action.isPrimaryAction {
+                actionButton.backgroundColor = UIColor(red: 0.86, green: 0.34, blue: 0.34, alpha: 1.0)
+                actionButton.setTitleColor(.white, for: .normal)
             } else {
-                button.layer.borderWidth = 1.2
-                button.layer.borderColor = UIColor(red: 0.64, green: 0.73, blue: 0.78, alpha: 1.0).cgColor
-                button.setTitleColor(UIColor(red: 0.80, green: 0.88, blue: 0.90, alpha: 1.0), for: .normal)
+                actionButton.layer.borderWidth = 1.2
+                actionButton.layer.borderColor = UIColor(red: 0.64, green: 0.73, blue: 0.78, alpha: 1.0).cgColor
+                actionButton.setTitleColor(UIColor(red: 0.80, green: 0.88, blue: 0.90, alpha: 1.0), for: .normal)
             }
 
-            buttonStack.addArrangedSubview(button)
+            actionButtonStack.addArrangedSubview(actionButton)
         }
     }
 
     @objc
-    private func onButtonTap(_ sender: UIButton) {
-        guard sender.tag < actions.count else {
-            dismiss()
+    private func handleButtonPress(_ sender: UIButton) {
+        guard sender.tag < configuredActions.count else {
+            hide()
             return
         }
-        let action = actions[sender.tag]
-        dismiss()
-        action.handler?()
+        let selectedAction = configuredActions[sender.tag]
+        hide()
+        selectedAction.actionHandler?()
     }
 }

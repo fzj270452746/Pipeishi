@@ -1,106 +1,100 @@
-//
-//  TileCell.swift
-//  Pipeishi
-//
-//  Refactored by Codex on 10/21/25.
-//
 
 import UIKit
 
-final class TileCell: UICollectionViewCell {
+final class GameTileCollectionCell: UICollectionViewCell {
 
-    static let reuseIdentifier = "TileCell"
+    static let cellIdentifier = "GameTileCollectionCell"
 
-    private let tileBackground = UIView()
-    private let imageView = UIImageView()
-    private let shineLayer = CAGradientLayer()
-    private let selectionLayer = CALayer()
+    private lazy var tileBackgroundContainer = UIView()
+    private lazy var tileImageView = UIImageView()
+    private lazy var highlightGradientLayer = CAGradientLayer()
+    private lazy var selectionBorderLayer = CALayer()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        configure()
+        assembleCellComponents()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        configure()
+        assembleCellComponents()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        let corner = min(bounds.width, bounds.height) * 0.12
-        tileBackground.layer.cornerRadius = corner
-        shineLayer.frame = tileBackground.bounds
-        selectionLayer.frame = tileBackground.bounds.insetBy(dx: 2, dy: 2)
-        selectionLayer.cornerRadius = corner - 2
+        let cornerRadius = min(bounds.width, bounds.height) * 0.12
+        tileBackgroundContainer.layer.cornerRadius = cornerRadius
+        highlightGradientLayer.frame = tileBackgroundContainer.bounds
+        selectionBorderLayer.frame = tileBackgroundContainer.bounds.insetBy(dx: 2, dy: 2)
+        selectionBorderLayer.cornerRadius = cornerRadius - 2
     }
 
-    func update(with tile: TileCard?, isSelected: Bool, isCleared: Bool) {
-        guard let tile else {
-            tileBackground.alpha = 0
-            imageView.image = nil
+    func updateDisplay(tile: MahjongTile?, selected: Bool, cleared: Bool) {
+        guard let tileData = tile else {
+            tileBackgroundContainer.alpha = 0
+            tileImageView.image = nil
             return
         }
 
-        tileBackground.alpha = isCleared ? 0.2 : 1.0
-        imageView.alpha = isCleared ? 0.2 : 1.0
-        imageView.image = UIImage(named: tile.imageName)
+        tileBackgroundContainer.alpha = cleared ? 0.2 : 1.0
+        tileImageView.alpha = cleared ? 0.2 : 1.0
+        tileImageView.image = UIImage(named: tileData.assetImageName)
 
-        selectionLayer.isHidden = !isSelected
-        if isSelected {
-            selectionLayer.borderColor = UIColor(red: 0.97, green: 0.87, blue: 0.54, alpha: 1.0).cgColor
-            selectionLayer.borderWidth = 3.0
+        selectionBorderLayer.isHidden = !selected
+        if selected {
+            selectionBorderLayer.borderColor = UIColor(red: 0.97, green: 0.87, blue: 0.54, alpha: 1.0).cgColor
+            selectionBorderLayer.borderWidth = 3.0
         } else {
-            selectionLayer.borderWidth = 0
+            selectionBorderLayer.borderWidth = 0
         }
     }
 
-    func playClearAnimation() {
+    func performClearAnimation() {
         UIView.animate(withDuration: 0.25, animations: {
-            self.imageView.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
-            self.imageView.alpha = 0.0
-            self.tileBackground.alpha = 0.0
+            self.tileImageView.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
+            self.tileImageView.alpha = 0.0
+            self.tileBackgroundContainer.alpha = 0.0
         }, completion: { _ in
-            self.imageView.transform = .identity
+            self.tileImageView.transform = .identity
         })
     }
 
-    func shake() {
-        let animation = CAKeyframeAnimation(keyPath: "transform.translation.x")
-        animation.values = [0, -6, 6, -4, 4, 0]
-        animation.duration = 0.3
-        layer.add(animation, forKey: "shake")
+    func performShakeAnimation() {
+        let shakeAnimation = CAKeyframeAnimation(keyPath: "transform.translation.x")
+        shakeAnimation.values = [0, -6, 6, -4, 4, 0]
+        shakeAnimation.duration = 0.3
+        layer.add(shakeAnimation, forKey: "shake")
     }
 
-    private func configure() {
-        contentView.addSubview(tileBackground)
-        tileBackground.translatesAutoresizingMaskIntoConstraints = false
+    private func assembleCellComponents() {
+        contentView.addSubview(tileBackgroundContainer)
+        tileBackgroundContainer.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            tileBackground.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            tileBackground.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            tileBackground.topAnchor.constraint(equalTo: contentView.topAnchor),
-            tileBackground.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+            tileBackgroundContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            tileBackgroundContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            tileBackgroundContainer.topAnchor.constraint(equalTo: contentView.topAnchor),
+            tileBackgroundContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
         ])
 
-        tileBackground.layer.insertSublayer(shineLayer, at: 0)
-        shineLayer.colors = [
+        tileBackgroundContainer.layer.insertSublayer(highlightGradientLayer, at: 0)
+        highlightGradientLayer.colors = [
             UIColor(red: 0.18, green: 0.23, blue: 0.28, alpha: 0.95).cgColor,
             UIColor(red: 0.10, green: 0.14, blue: 0.18, alpha: 0.95).cgColor
         ]
-        shineLayer.startPoint = CGPoint(x: 0, y: 0)
-        shineLayer.endPoint = CGPoint(x: 1, y: 1)
-        tileBackground.layer.insertSublayer(selectionLayer, above: shineLayer)
-        selectionLayer.borderColor = UIColor.clear.cgColor
-        selectionLayer.borderWidth = 0
+        highlightGradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        highlightGradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        tileBackgroundContainer.layer.insertSublayer(selectionBorderLayer, above: highlightGradientLayer)
+        selectionBorderLayer.borderColor = UIColor.clear.cgColor
+        selectionBorderLayer.borderWidth = 0
 
-        imageView.contentMode = .scaleAspectFit
-        tileBackground.addSubview(imageView)
-        imageView.translatesAutoresizingMaskIntoConstraints = false
+        tileImageView.contentMode = .scaleAspectFit
+        tileBackgroundContainer.addSubview(tileImageView)
+        tileImageView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            imageView.centerXAnchor.constraint(equalTo: tileBackground.centerXAnchor),
-            imageView.centerYAnchor.constraint(equalTo: tileBackground.centerYAnchor),
-            imageView.widthAnchor.constraint(equalTo: tileBackground.widthAnchor, multiplier: 0.88),
-            imageView.heightAnchor.constraint(equalTo: tileBackground.heightAnchor, multiplier: 0.88)
+            tileImageView.centerXAnchor.constraint(equalTo: tileBackgroundContainer.centerXAnchor),
+            tileImageView.centerYAnchor.constraint(equalTo: tileBackgroundContainer.centerYAnchor),
+            tileImageView.widthAnchor.constraint(equalTo: tileBackgroundContainer.widthAnchor, multiplier: 0.88),
+            tileImageView.heightAnchor.constraint(equalTo: tileBackgroundContainer.heightAnchor, multiplier: 0.88)
         ])
 
         layer.shadowColor = UIColor.black.cgColor

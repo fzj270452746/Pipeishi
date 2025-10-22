@@ -1,113 +1,108 @@
-//
-//  LeaderboardCell.swift
-//  Pipeishi
-//
-//  Refactored by Codex on 10/21/25.
-//
 
 import UIKit
 
-final class LeaderboardCell: UITableViewCell {
+final class ScoreBoardTableCell: UITableViewCell {
 
-    static let reuseIdentifier = "LeaderboardCell"
+    static let cellIdentifier = "ScoreBoardTableCell"
 
-    private let rankLabel = UILabel()
-    private let scoreLabel = UILabel()
-    private let subtitleLabel = UILabel()
-    private let badgeView = UIImageView()
-    private let backdrop = UIView()
+    private lazy var positionLabel = UILabel()
+    private lazy var scoreValueLabel = UILabel()
+    private lazy var descriptionTextLabel = UILabel()
+    private lazy var achievementIconView = UIImageView()
+    private lazy var cellBackdrop = UIView()
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
-        configure()
+        assembleCellLayout()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        configure()
+        assembleCellLayout()
     }
 
-    private func configure() {
+    private func assembleCellLayout() {
         selectionStyle = .none
         backgroundColor = .clear
         contentView.backgroundColor = .clear
 
-        backdrop.layer.cornerRadius = 12
-        backdrop.layer.borderWidth = 1.0
-        backdrop.layer.borderColor = UIColor(red: 0.33, green: 0.44, blue: 0.50, alpha: 0.4).cgColor
-        backdrop.backgroundColor = UIColor(red: 0.12, green: 0.18, blue: 0.24, alpha: 0.6)
+        cellBackdrop.layer.cornerRadius = 12
+        cellBackdrop.layer.borderWidth = 1.0
+        cellBackdrop.layer.borderColor = UIColor(red: 0.33, green: 0.44, blue: 0.50, alpha: 0.4).cgColor
+        cellBackdrop.backgroundColor = UIColor(red: 0.12, green: 0.18, blue: 0.24, alpha: 0.6)
 
-        rankLabel.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-        rankLabel.textColor = UIColor(red: 0.82, green: 0.89, blue: 0.91, alpha: 1.0)
+        positionLabel.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        positionLabel.textColor = UIColor(red: 0.82, green: 0.89, blue: 0.91, alpha: 1.0)
 
-        scoreLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 18, weight: .bold)
-        scoreLabel.textColor = UIColor(red: 0.96, green: 0.85, blue: 0.61, alpha: 1.0)
+        scoreValueLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 18, weight: .bold)
+        scoreValueLabel.textColor = UIColor(red: 0.96, green: 0.85, blue: 0.61, alpha: 1.0)
 
-        subtitleLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-        subtitleLabel.textColor = UIColor(red: 0.60, green: 0.69, blue: 0.74, alpha: 1.0)
-        subtitleLabel.numberOfLines = 0
-        subtitleLabel.lineBreakMode = .byWordWrapping
+        descriptionTextLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        descriptionTextLabel.textColor = UIColor(red: 0.60, green: 0.69, blue: 0.74, alpha: 1.0)
+        descriptionTextLabel.numberOfLines = 0
+        descriptionTextLabel.lineBreakMode = .byWordWrapping
 
-        badgeView.contentMode = .scaleAspectFit
-        badgeView.tintColor = UIColor(red: 0.98, green: 0.90, blue: 0.55, alpha: 1.0)
-        badgeView.setContentHuggingPriority(.required, for: .horizontal)
-        badgeView.isHidden = true
+        achievementIconView.contentMode = .scaleAspectFit
+        achievementIconView.tintColor = UIColor(red: 0.98, green: 0.90, blue: 0.55, alpha: 1.0)
+        achievementIconView.setContentHuggingPriority(.required, for: .horizontal)
+        achievementIconView.isHidden = true
 
-        contentView.addSubview(backdrop)
-        backdrop.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(cellBackdrop)
+        cellBackdrop.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            backdrop.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            backdrop.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            backdrop.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
-            backdrop.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8)
+            cellBackdrop.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            cellBackdrop.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            cellBackdrop.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            cellBackdrop.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8)
         ])
 
-        let textStack = UIStackView(arrangedSubviews: [rankLabel, subtitleLabel])
-        textStack.axis = .vertical
-        textStack.spacing = 2
+        let labelVerticalStack = UIStackView(arrangedSubviews: [positionLabel, descriptionTextLabel])
+        labelVerticalStack.axis = .vertical
+        labelVerticalStack.spacing = 2
 
-        let spacer = UIView()
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let flexibleSpacer = UIView()
+        flexibleSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let horizontal = UIStackView(arrangedSubviews: [textStack, spacer, scoreLabel, badgeView])
-        horizontal.axis = .horizontal
-        horizontal.alignment = .center
-        horizontal.spacing = 12
+        let mainHorizontalStack = UIStackView(arrangedSubviews: [labelVerticalStack, flexibleSpacer, scoreValueLabel, achievementIconView])
+        mainHorizontalStack.axis = .horizontal
+        mainHorizontalStack.alignment = .center
+        mainHorizontalStack.spacing = 12
 
-        backdrop.addSubview(horizontal)
-        horizontal.translatesAutoresizingMaskIntoConstraints = false
+        cellBackdrop.addSubview(mainHorizontalStack)
+        mainHorizontalStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            horizontal.leadingAnchor.constraint(equalTo: backdrop.leadingAnchor, constant: 16),
-            horizontal.trailingAnchor.constraint(equalTo: backdrop.trailingAnchor, constant: -16),
-            horizontal.topAnchor.constraint(equalTo: backdrop.topAnchor, constant: 12),
-            horizontal.bottomAnchor.constraint(equalTo: backdrop.bottomAnchor, constant: -12)
+            mainHorizontalStack.leadingAnchor.constraint(equalTo: cellBackdrop.leadingAnchor, constant: 16),
+            mainHorizontalStack.trailingAnchor.constraint(equalTo: cellBackdrop.trailingAnchor, constant: -16),
+            mainHorizontalStack.topAnchor.constraint(equalTo: cellBackdrop.topAnchor, constant: 12),
+            mainHorizontalStack.bottomAnchor.constraint(equalTo: cellBackdrop.bottomAnchor, constant: -12)
         ])
     }
 
-    func apply(rank: Int, score: Int?) {
-        if let score {
-            rankLabel.text = "#\(rank)"
-            scoreLabel.text = "\(score)"
-            subtitleLabel.text = "Score"
-            badgeView.isHidden = rank > 3
-            if badgeView.isHidden {
-                badgeView.image = nil
-                backdrop.backgroundColor = UIColor(red: 0.12, green: 0.18, blue: 0.24, alpha: 0.6)
+    func configure(position: Int, scoreValue: Int?) {
+        if let validScore = scoreValue {
+            positionLabel.text = "#\(position)"
+            scoreValueLabel.text = "\(validScore)"
+            descriptionTextLabel.text = "Score"
+            achievementIconView.isHidden = position > 3
+
+            if achievementIconView.isHidden {
+                achievementIconView.image = nil
+                cellBackdrop.backgroundColor = UIColor(red: 0.12, green: 0.18, blue: 0.24, alpha: 0.6)
             } else {
-                badgeView.image = UIImage(systemName: symbol(for: rank))
-                backdrop.backgroundColor = highlightColor(for: rank)
+                achievementIconView.image = UIImage(systemName: retrieveIconSymbol(forPosition: position))
+                cellBackdrop.backgroundColor = retrieveHighlightColor(forPosition: position)
             }
         } else {
-            rankLabel.text = "No scores yet"
-            scoreLabel.text = "-"
-            subtitleLabel.text = "Play a round to record a score."
-            badgeView.isHidden = true
-            backdrop.backgroundColor = UIColor(red: 0.12, green: 0.18, blue: 0.24, alpha: 0.6)
+            positionLabel.text = "No scores yet"
+            scoreValueLabel.text = "-"
+            descriptionTextLabel.text = "Play a round to record a score."
+            achievementIconView.isHidden = true
+            cellBackdrop.backgroundColor = UIColor(red: 0.12, green: 0.18, blue: 0.24, alpha: 0.6)
         }
     }
 
-    private func symbol(for rank: Int) -> String {
-        switch rank {
+    private func retrieveIconSymbol(forPosition position: Int) -> String {
+        switch position {
         case 1:
             return "crown.fill"
         case 2:
@@ -117,8 +112,8 @@ final class LeaderboardCell: UITableViewCell {
         }
     }
 
-    private func highlightColor(for rank: Int) -> UIColor {
-        switch rank {
+    private func retrieveHighlightColor(forPosition position: Int) -> UIColor {
+        switch position {
         case 1:
             return UIColor(red: 0.62, green: 0.45, blue: 0.22, alpha: 0.85)
         case 2:
